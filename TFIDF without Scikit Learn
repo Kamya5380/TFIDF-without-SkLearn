@@ -1,0 +1,88 @@
+#Sample DataSet
+corpus = [
+     'this is the first document',
+     'this document is the second document',
+     'and this is the third one',
+     'is this the first document',
+]
+
+#Importing libraries
+from collections import Counter
+from tqdm import tqdm
+from scipy.sparse import csr_matrix
+import math
+import operator
+from sklearn.preprocessing import normalize
+import numpy
+
+#Creating vocab with unique words and their counts
+def fit(dataset):
+    unique_words = set()
+    if isinstance(dataset, (list,)):
+        for row in dataset:
+            for word in row.split(" "):
+                if len(word) <2:
+                    continue
+                unique_words.add(word)
+        unique_words=sorted(list(unique_words))
+        vocab = {j:i for i,j in enumerate(unique_words)}
+        return vocab
+    else:
+        print("Please pass a list!")
+        
+  vocab= fit(corpus)
+  
+  #Computing the IDF values
+  def computeIDF(docList,corpus):
+    #print(docList)
+    import math
+    idfDict = {}
+    N = len(corpus)    
+    idfDict = dict.fromkeys(docList.keys(), 0)    
+    for word in docList:  
+        count=0
+        for doc in corpus: 
+            wordSet= doc.split(" ")              
+            if(word in wordSet):
+                count=count+1
+        idfDict[word]= count
+    for word, val in idfDict.items():
+        idfDict[word] = 1 + (math.log((1+N) / (1+val)))  @Sklearn calculates IDF differently then normal IDF
+    return idfDict
+
+#Computing TF
+def computeTF(word, row):
+    row=row.split(" ")
+    freq = row.count(word)
+    N = len(row)
+    return (freq/N)
+
+IDFvalues =computeIDF(vocab,corpus)
+
+#Calculating IDF values of each term
+def transform(dataset,vocab):
+    rows=[]
+    columns=[]
+    values=[]
+    IDFvalues =computeIDF(vocab,dataset)
+    if isinstance(dataset,(list,)):
+        for idx,row in enumerate(tqdm(dataset)): 
+            word_freq =dict(Counter(row.split()))  
+            for word,freq in word_freq.items(): 
+                if len(word) <2:
+                    continue
+                col_index=vocab.get(word,-1) 
+                if col_index != -1:
+                    rows.append(idx)
+                    columns.append(col_index)
+                    tf= computeTF(word, row)
+                    idf= IDFvalues[word]
+                    values.append(tf*idf)
+        return csr_matrix((values, (rows,columns)), shape =(len(dataset), len(vocab))) 
+    
+val= transform(corpus, vocab).toarray()
+
+#Normalizing the output to match the SkLearn output
+output= normalize(val, norm='l2',  axis=1, copy=True, return_norm=False)
+
+output[0]
